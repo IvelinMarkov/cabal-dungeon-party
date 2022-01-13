@@ -15,6 +15,9 @@ const dungeonMaps = {
     "mi": "Mirage Island",
     "ami": "Awakened Mirage Island",
     "ft3": "Forgotten Template B3F",
+    "eod3": "Tower of the Undead (B3F)",
+    "aft": "Forgotten Temple (B2F) Awakened",
+    "ac": "Abandoned City",
 }
 
 
@@ -44,20 +47,21 @@ let fbRequired;
 let currentParticipants = [];
 
 client.on('messageCreate', (message) => {
-    if (!message.content.startsWith(CMD_PREFIX) || !message.member.permissions.has("ADMINISTRATOR")) return;
+    if (!message.content.startsWith(CMD_PREFIX)) return;
+    if (!message.member.permissions.has("ADMINISTRATOR") || (message.author.id != "435421736331116564" && message.autor.id != "383383721673228289")) return message.reply("you don't have permissions 🙁");
 
     let [command, dngName, dngCount] = message.content.trim().substring(1).split(/\s+/);
     command = command.toLowerCase();
     if (!commandsMap.hasOwnProperty(command)) return;
 
-    dungeonName = dungeonMaps[dngName];
+    dungeonName = dungeonMaps[dngName.toLowerCase()];
     dungeonCount = dngCount;
 
     commandsMap[command](message);
 })
 
 client.on('messageReactionAdd', (reaction, user) => {
-    if (!partyMessage.id || reaction.message.id != partyMessage.id || user.bot || currentParticipants.some(u => u.id == user.id)) return;
+    if (!partyMessage || !partyMessage.id || reaction.message.id != partyMessage.id || user.bot || reaction.emoji.name != "➕" || currentParticipants.some(u => u.id == user.id)) return;
 
     currentParticipants.push(user);
     const partyEmbed = createEmbed();
@@ -65,7 +69,7 @@ client.on('messageReactionAdd', (reaction, user) => {
 })
 
 client.on('messageReactionRemove', (reaction, user) => {
-    if (!partyMessage.id || reaction.message.id != partyMessage.id || user.bot || partyAuthor.id == user.id) return;
+    if (!partyMessage || !partyMessage.id || reaction.message.id != partyMessage.id || user.bot || reaction.emoji.name != "➕" || partyAuthor.id == user.id) return;
 
     const userIndex = currentParticipants.findIndex(u => u.id == user.id);
     currentParticipants.splice(userIndex, 1);
@@ -74,19 +78,21 @@ client.on('messageReactionRemove', (reaction, user) => {
 })
 
 async function createParty(message) {
-
     await message.channel.send("When?");
     date = await waitForCreator();
     await message.channel.send("Max party size?");
     size = await waitForCreator();
     await message.channel.send("Do you require a Force Blader?");
     fbRequired = await waitForCreator();
+    await message.channel.send("To which channel to send the party?");
+    const channelLink = await waitForCreator();
+    const channelId = channelLink.substring(2, channelLink.length - 1);
 
     currentParticipants.push(message.author);
     partyAuthor = message.author;
 
     const partyEmbed = createEmbed();
-    const newMessage = await message.channel.send({ embeds: [partyEmbed] });
+    const newMessage = await (await client.channels.fetch(channelId)).send({ embeds: [partyEmbed] });
     await newMessage.react('➕');
 
     partyMessage = newMessage;
