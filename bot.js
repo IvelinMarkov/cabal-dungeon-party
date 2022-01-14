@@ -48,7 +48,7 @@ let currentParticipants = [];
 
 client.on('messageCreate', (message) => {
     if (!message.content.startsWith(CMD_PREFIX)) return;
-    if (!message.member.permissions.has("ADMINISTRATOR") || (message.author.id != "435421736331116564" && message.autor.id != "383383721673228289")) return message.reply("you don't have permissions 🙁");
+    if (!message.member.permissions.has("ADMINISTRATOR") || (message.author.id != "435421736331116564" && message.author.id != "383383721673228289")) return message.reply("you don't have permissions 🙁");
 
     let [command, dngName, dngCount] = message.content.trim().substring(1).split(/\s+/);
     command = command.toLowerCase();
@@ -61,7 +61,14 @@ client.on('messageCreate', (message) => {
 })
 
 client.on('messageReactionAdd', (reaction, user) => {
-    if (!partyMessage || !partyMessage.id || reaction.message.id != partyMessage.id || user.bot || reaction.emoji.name != "➕" || currentParticipants.some(u => u.id == user.id)) return;
+    if (
+        !partyMessage ||
+        !partyMessage.id ||
+        reaction.message.id != partyMessage.id ||
+        user.bot ||
+        reaction.emoji.name != "➕" ||
+        currentParticipants.some(u => u.id == user.id) ||
+        currentParticipants.length >= size) return;
 
     currentParticipants.push(user);
     const partyEmbed = createEmbed();
@@ -72,20 +79,23 @@ client.on('messageReactionRemove', (reaction, user) => {
     if (!partyMessage || !partyMessage.id || reaction.message.id != partyMessage.id || user.bot || reaction.emoji.name != "➕" || partyAuthor.id == user.id) return;
 
     const userIndex = currentParticipants.findIndex(u => u.id == user.id);
+    if (userIndex == -1) return;
     currentParticipants.splice(userIndex, 1);
     const partyEmbed = createEmbed();
     partyMessage.edit({ embeds: [partyEmbed] });
 })
 
 async function createParty(message) {
+    currentParticipants = [];
+    const commandChannelId = message.channel.id;
     await message.channel.send("When?");
-    date = await waitForCreator();
+    date = await waitForCreator(commandChannelId);
     await message.channel.send("Max party size?");
-    size = await waitForCreator();
+    size = await waitForCreator(commandChannelId);
     await message.channel.send("Do you require a Force Blader?");
-    fbRequired = await waitForCreator();
+    fbRequired = await waitForCreator(commandChannelId);
     await message.channel.send("To which channel to send the party?");
-    const channelLink = await waitForCreator();
+    const channelLink = await waitForCreator(commandChannelId);
     const channelId = channelLink.substring(2, channelLink.length - 1);
 
     currentParticipants.push(message.author);
@@ -102,9 +112,10 @@ function removeParty(message) {
     message.channel.send("Party ... has been removed!");
 }
 
-function waitForCreator() {
+function waitForCreator(commandChannelId) {
     return new Promise((resolve) => {
-        client.once('messageCreate', (message) => {
+        client.once('messageCreate', async (message) => {
+            if (message.channel != commandChannelId) resolve(await waitForCreator(commandChannelId));
             resolve(message.content);
         })
     })
